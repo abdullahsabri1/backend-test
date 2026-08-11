@@ -14,7 +14,7 @@ const { protect, authorize } = require("../middleware/authMiddleware");
 
 router.use(protect);
 
-router.get("/", authorize("admin"), getAllBooks);
+router.get("/", authorize("admin", "user"), getAllBooks);
 router.get("/:id", authorize("user", "admin"), getBookById);
 
 router.post("/", authorize("user"), upload.single("file"), createBook);

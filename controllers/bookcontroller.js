@@ -6,10 +6,18 @@ const getAllBooks = async (req, res) => {
     const limitNum = Math.max(1, parseInt(req.query.limit, 10) || 10);
     const skipNum = (pageNum - 1) * limitNum;
 
-    const query = req.user.role === "admin" ? {} : { createdBy: req.user._id };
+    let query = {};
+
+    if (req.user?.role !== "admin" && req.user?._id) {
+      query.createdBy = req.user._id;
+    }
 
     if (req.query.category) {
       query.category = req.query.category;
+    }
+
+    if (req.query.author) {
+      query.author = { $regex: req.query.author.trim(), $options: "i" };
     }
 
     if (req.query.search) {
@@ -28,12 +36,12 @@ const getAllBooks = async (req, res) => {
     const total = await Book.countDocuments(query);
 
     return res.status(200).json({
+      success: true,
       total,
       page: pageNum,
       pages: Math.ceil(total / limitNum),
       count: books.length,
       data: books,
-      books: books,
     });
   } catch (err) {
     return res

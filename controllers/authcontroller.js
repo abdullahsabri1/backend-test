@@ -5,10 +5,28 @@ const ACCESS_SECRET = process.env.JWT_SECRET || "fallback_super_secret_key";
 const REFRESH_SECRET =
   process.env.JWT_REFRESH_SECRET || "fallback_refresh_super_secret_key";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const PASSWORD_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
 const register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
     const normalizedEmail = email ? email.toLowerCase().trim() : "";
+
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      return res.status(400).json({
+        message: "Invalid email format. Please provide a valid email address.",
+      });
+    }
+
+    if (!PASSWORD_REGEX.test(password)) {
+      return res.status(400).json({
+        message:
+          "Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character (@$!%*?&).",
+      });
+    }
 
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {

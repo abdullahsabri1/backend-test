@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "cors": "^2.8.6",
-    "multer": "^2.2.0"
+    "multer": "^2.2.0",
+    "ngrok": "^5.0.0-beta.2"
   }
 }

@@ -14,8 +14,9 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   "http://localhost:4173",
+  "http://172.16.2.93:5173",
+  "https://riot-reacquire-unstylish.ngrok-free.dev",
 ];
-
 app.use(
   cors({
     origin: (origin, callback) => {
