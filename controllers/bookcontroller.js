@@ -1,5 +1,7 @@
 const Book = require("../models/Book");
 const path = require("path");
+const Fuse = require("fuse.js");
+
 const getAllBooks = async (req, res) => {
   try {
     const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -85,6 +87,58 @@ const getBookById = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Server error", error: err.message });
+  }
+};
+
+const getBooksByNameOrAuthor = async (req, res) => {
+  try {
+    const { author, name, page = 1, limit = 10 } = req.query;
+
+    const pageNum = Math.max(1, parseInt(page, 10));
+    const limitNum = Math.max(1, parseInt(limit, 10));
+
+    const allBooks = await Book.find()
+      .populate("createdBy", "name email")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const searchTerm = [author, name].filter(Boolean).join(" ").trim();
+
+    let results = allBooks;
+
+    if (searchTerm) {
+      const fuseOptions = {
+        keys: ["title", "author"],
+        threshold: 0.5,
+        ignoreLocation: true,
+      };
+
+      const fuse = new Fuse(allBooks, fuseOptions);
+      const searchResults = fuse.search(searchTerm);
+
+      results = searchResults.map((result) => result.item);
+    }
+
+    const total = results.length;
+    const paginatedBooks = results.slice(
+      (pageNum - 1) * limitNum,
+      pageNum * limitNum,
+    );
+
+    return res.status(200).json({
+      success: true,
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / limitNum),
+      count: paginatedBooks.length,
+      data: paginatedBooks,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message,
+    });
   }
 };
 
@@ -224,6 +278,7 @@ const downloadBook = async (req, res) => {
 module.exports = {
   getAllBooks,
   getBookById,
+  getBooksByNameOrAuthor,
   createBook,
   updateBook,
   deleteBook,

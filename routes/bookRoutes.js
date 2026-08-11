@@ -9,12 +9,14 @@ const {
   updateBook,
   deleteBook,
   downloadBook,
+  getBooksByNameOrAuthor,
 } = require("../controllers/bookController");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
 router.use(protect);
 
 router.get("/", authorize("admin", "user"), getAllBooks);
+router.get("/search", authorize("admin", "user"), getBooksByNameOrAuthor);
 router.get("/:id", authorize("user", "admin"), getBookById);
 
 router.post("/", authorize("user"), upload.single("file"), createBook);

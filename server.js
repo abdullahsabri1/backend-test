@@ -11,16 +11,19 @@ const bookRoutes = require("./routes/bookRoutes");
 const app = express();
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",")
+  ? process.env.ALLOWED_ORIGINS.split(",").map((origin) => origin.trim())
   : [];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        return callback(null, true);
       } else {
-        callback(new Error("Not allowed by CORS"));
+        console.error(`Blocked by CORS: "${origin}"`);
+        return callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
