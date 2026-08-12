@@ -90,58 +90,6 @@ const getBookById = async (req, res) => {
   }
 };
 
-const getBooksByNameOrAuthor = async (req, res) => {
-  try {
-    const { author, name, page = 1, limit = 10 } = req.query;
-
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.max(1, parseInt(limit, 10));
-
-    const allBooks = await Book.find()
-      .populate("createdBy", "name email")
-      .sort({ createdAt: -1 })
-      .lean();
-
-    const searchTerm = [author, name].filter(Boolean).join(" ").trim();
-
-    let results = allBooks;
-
-    if (searchTerm) {
-      const fuseOptions = {
-        keys: ["title", "author"],
-        threshold: 0.5,
-        ignoreLocation: true,
-      };
-
-      const fuse = new Fuse(allBooks, fuseOptions);
-      const searchResults = fuse.search(searchTerm);
-
-      results = searchResults.map((result) => result.item);
-    }
-
-    const total = results.length;
-    const paginatedBooks = results.slice(
-      (pageNum - 1) * limitNum,
-      pageNum * limitNum,
-    );
-
-    return res.status(200).json({
-      success: true,
-      total,
-      page: pageNum,
-      pages: Math.ceil(total / limitNum),
-      count: paginatedBooks.length,
-      data: paginatedBooks,
-    });
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: err.message,
-    });
-  }
-};
-
 const createBook = async (req, res) => {
   try {
     if (!req.file) {
@@ -275,10 +223,128 @@ const downloadBook = async (req, res) => {
   }
 };
 
+const getBooks = async (req, res) => {
+  try {
+    const { page, limit, sort, order, search, ...filters } = req.query;
+
+    let mongoQuery = {};
+
+    if (search && String(search).trim() !== "") {
+      const searchRegex = { $regex: String(search).trim(), $options: "i" };
+      mongoQuery.$or = [
+        { title: searchRegex },
+        { author: searchRegex },
+        { description: searchRegex },
+        { publisher: searchRegex },
+        { originalName: searchRegex },
+        { isbn: searchRegex },
+      ];
+    }
+
+    Object.keys(filters).forEach((key) => {
+      let value = filters[key];
+
+      if (
+        value === undefined ||
+        value === null ||
+        (typeof value === "string" && value.trim() === "")
+      ) {
+        return;
+      }
+
+      const rangeMatch = key.match(/^(\w+)\[(gte|gt|lte|lt)\]$/);
+      if (rangeMatch) {
+        const [, field, op] = rangeMatch;
+        const numVal = !isNaN(value) ? Number(value) : value;
+        mongoQuery[field] = mongoQuery[field] || {};
+        mongoQuery[field][`$${op}`] = numVal;
+        return;
+      }
+
+      if (
+        typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value)
+      ) {
+        let rangeObj = {};
+        Object.keys(value).forEach((op) => {
+          if (["gte", "gt", "lte", "lt"].includes(op)) {
+            const rawVal = value[op];
+            rangeObj[`$${op}`] = !isNaN(rawVal) ? Number(rawVal) : rawVal;
+          }
+        });
+        if (Object.keys(rangeObj).length > 0) {
+          mongoQuery[key] = { ...mongoQuery[key], ...rangeObj };
+        }
+        return;
+      }
+
+      if (typeof value === "string" && value.includes(",")) {
+        const list = value.split(",").map((item) => item.trim());
+        mongoQuery[key] = { $in: list };
+        return;
+      }
+
+      if (value === "true" || value === "false") {
+        mongoQuery[key] = value === "true";
+        return;
+      }
+
+      if (
+        !isNaN(value) &&
+        typeof value !== "boolean" &&
+        String(value).trim() !== "" &&
+        key !== "isbn"
+      ) {
+        mongoQuery[key] = Number(value);
+        return;
+      }
+
+      if (typeof value === "string") {
+        mongoQuery[key] = { $regex: value.trim(), $options: "i" };
+      }
+    });
+
+    let sortBy = "-createdAt";
+    if (sort) {
+      const sortOrder = order === "asc" ? "" : "-";
+      sortBy = `${sortOrder}${sort}`;
+    }
+
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 10;
+    const skip = (pageNum - 1) * limitNum;
+
+    const books = await Book.find(mongoQuery)
+      .populate("createdBy", "name email")
+      .sort(sortBy)
+      .skip(skip)
+      .limit(limitNum);
+
+    const total = await Book.countDocuments(mongoQuery);
+
+    return res.status(200).json({
+      success: true,
+      count: books.length,
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / limitNum),
+      queryExecuted: mongoQuery,
+      data: books,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllBooks,
   getBookById,
-  getBooksByNameOrAuthor,
+
+  getBooks,
   createBook,
   updateBook,
   deleteBook,
