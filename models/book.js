@@ -50,7 +50,10 @@ const bookSchema = new mongoose.Schema(
       ],
       index: true,
     },
-    filePath: { type: String },
+    filePath: {
+      type: String,
+      select: false,
+    },
     fileName: { type: String },
     originalName: { type: String },
     fileSize: { type: Number },

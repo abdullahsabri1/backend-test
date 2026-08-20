@@ -1,4 +1,4 @@
-const Book = require("../models/Book");
+const Book = require("../../models/Book");
 const path = require("path");
 const Fuse = require("fuse.js");
 
